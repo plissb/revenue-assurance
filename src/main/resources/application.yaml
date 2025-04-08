@@ -9,11 +9,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     enabled: true
@@ -31,11 +31,12 @@ server:
 
 # Настройки для ClickHouse
 clickhouse:
-  url: jdbc:clickhouse://localhost:8124/ra_analytics
-  username: default
-  password:
-  database: ra_analytics
-  enabled: false # Отключаем ClickHouse для локальной разработки, если сервер не запущен
+  datasource:
+    url: jdbc:clickhouse://localhost:8124/ra_analytics
+    username: default
+    password: clickhouse
+    driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
+  enabled: true # Отключаем ClickHouse для локальной разработки, если сервер не запущен
 
 # Настройки для мониторинга файлов
 app:

@@ -41,7 +41,7 @@ public class CsvService {
 
     @Autowired
     public CsvService(FileUploadRepository fileUploadRepository, 
-                      @Autowired(required = false) ClickHouseService clickHouseService) {
+                      @Autowired ClickHouseService clickHouseService) {
         this.fileUploadRepository = fileUploadRepository;
         this.clickHouseService = clickHouseService;
         log.info("CsvService initialized, ClickHouse enabled: {}", 
@@ -60,7 +60,6 @@ public class CsvService {
         
         // Создаем запись о загрузке файла
         FileUpload fileUpload = new FileUpload();
-        fileUpload.setId(UUID.randomUUID());
         fileUpload.setFileName(file.getName());
         fileUpload.setFileSize(file.length());
         fileUpload.setStatus("PROCESSING");
@@ -109,7 +108,6 @@ public class CsvService {
                     fileUpload.setStatus("COMPLETED");
                     fileUpload.setRecordsProcessed(recordsProcessed);
                     fileUpload.setUpdatedAt(LocalDateTime.now());
-                    fileUpload = fileUploadRepository.save(fileUpload);
                     
                     // Перемещаем файл в директорию успешных загрузок
                     moveFile(file, DONE_DIR);
@@ -126,7 +124,6 @@ public class CsvService {
             fileUpload.setStatus("ERROR");
             fileUpload.setErrorMessage(e.getMessage());
             fileUpload.setUpdatedAt(LocalDateTime.now());
-            fileUpload = fileUploadRepository.save(fileUpload);
             
             // Перемещаем файл в директорию ошибок
             moveFile(file, ERROR_DIR);

@@ -23,4 +23,4 @@ spring:
 
 # Отключаем ClickHouse для локальной разработки
 clickhouse:
-  enabled: false 
+  enabled: true 

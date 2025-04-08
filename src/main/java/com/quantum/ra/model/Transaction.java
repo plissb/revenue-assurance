@@ -10,6 +10,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Класс, представляющий данные транзакции из CSV файла
@@ -108,6 +110,8 @@ public class Transaction {
     // Метаданные загрузки
     private UUID fileUploadId;
     private LocalDateTime loadTimestamp;
+    
+    private static final Logger log = LoggerFactory.getLogger(Transaction.class);
     
     /**
      * Фабричный метод для создания объекта Transaction из строки CSV
@@ -237,6 +241,7 @@ public class Transaction {
         try {
             return LocalDateTime.parse(value.trim(), formatter);
         } catch (Exception e) {
+            log.warn("Could not parse DateTime: '{}', returning null.", value);
             return null;
         }
     }
@@ -248,6 +253,7 @@ public class Transaction {
         try {
             return LocalDate.parse(value.trim(), formatter);
         } catch (Exception e) {
+            log.warn("Could not parse Date: '{}', returning null.", value);
             return null;
         }
     }

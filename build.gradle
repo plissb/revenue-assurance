@@ -32,7 +32,15 @@ dependencies {
     
     // ClickHouse JDBC driver
     implementation 'com.clickhouse:clickhouse-jdbc:0.4.6'
+    // Добавляем библиотеку для поддержки сжатия LZ4 в ClickHouse JDBC
+    implementation 'org.lz4:lz4-java:1.8.0'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    // Добавляем Layout Dialect для компоновки шаблонов
+    implementation 'nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.3.0'
+
+    // Добавляем DevTools
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    
 
     compileOnly 'org.projectlombok:lombok'
     

@@ -1,5 +1,7 @@
 CREATE DATABASE IF NOT EXISTS ra_analytics;
 
+drop table IF EXISTS ra_analytics.transactions;
+
 CREATE TABLE IF NOT EXISTS ra_analytics.transactions
 (
     id UUID,
@@ -27,12 +29,12 @@ CREATE TABLE IF NOT EXISTS ra_analytics.transactions
     reference_number String,
     created_on DateTime,
     created_by String,
-    modified_on DateTime,
+    modified_on Nullable(DateTime),
     modified_by String,
-    app_1_date DateTime,
-    app_2_date DateTime,
+    app_1_date Nullable(DateTime),
+    app_2_date Nullable(DateTime),
     transfer_id String,
-    transfer_datetime DateTime,
+    transfer_datetime Nullable(DateTime),
     sender_category_code String,
     sender_domain_code String,
     sender_grade_name String,
@@ -54,7 +56,7 @@ CREATE TABLE IF NOT EXISTS ra_analytics.transactions
     transfer_subtype String,
     payment_type String,
     payment_number String,
-    payment_date DateTime,
+    payment_date Nullable(DateTime),
     remarks String,
     action_type String,
     transaction_tag String,
@@ -73,7 +75,7 @@ CREATE TABLE IF NOT EXISTS ra_analytics.transactions
     tno_id String,
     unreg_first_name String,
     unreg_last_name String,
-    unreg_dob Date,
+    unreg_dob Nullable(Date),
     unreg_id_number String,
     bulk_payout_batchid String,
     is_financial String,
@@ -88,8 +90,8 @@ CREATE TABLE IF NOT EXISTS ra_analytics.transactions
     receiver_user_type String,
     txnmode String,
     file_upload_id UUID,
-    load_timestamp DateTime
+    load_timestamp Nullable(DateTime)
 )
 ENGINE = MergeTree()
-ORDER BY (transfer_datetime, sender_msisdn, receiver_msisdn)
-PARTITION BY toYYYYMM(transfer_datetime); 
+ORDER BY (created_on, sender_msisdn, receiver_msisdn)
+PARTITION BY toYYYYMM(created_on);

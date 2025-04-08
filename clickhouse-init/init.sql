@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS ra_analytics.transactions
     sender_user_type String,
     receiver_user_type String,
     txnmode String,
-    file_name String,
+    file_upload_id UUID,
     load_timestamp DateTime
 )
 ENGINE = MergeTree()

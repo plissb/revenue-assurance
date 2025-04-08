@@ -29,11 +29,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.apache.camel.springboot:camel-spring-boot-starter:4.11.0'
     implementation 'org.liquibase:liquibase-core'
+    implementation 'org.apache.commons:commons-io:1.3.2' // для WildcardFileFilter
     
-    // ClickHouse зависимости (Client v2 - последняя стабильная версия)
-    implementation platform('com.clickhouse:clickhouse-bom:0.4.6')
-    implementation 'com.clickhouse:clickhouse-client:0.4.6'
-    implementation 'com.clickhouse:clickhouse-http-client:0.4.6'
+    // ClickHouse зависимости - используем старую стабильную версию
+    implementation 'ru.yandex.clickhouse:clickhouse-jdbc:0.3.2'
     
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'

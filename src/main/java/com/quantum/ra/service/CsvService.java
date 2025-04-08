@@ -1,17 +1,25 @@
 package com.quantum.ra.service;
 
+import com.quantum.ra.model.FileUpload;
 import com.quantum.ra.model.Transaction;
+import com.quantum.ra.repository.FileUploadRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Сервис для обработки CSV файлов с транзакциями
@@ -22,62 +30,120 @@ import java.util.List;
 public class CsvService {
 
     private final ClickHouseService clickHouseService;
+    private final FileUploadRepository fileUploadRepository;
+    
+    private static final Path INPUT_DIR = Paths.get("data/input");
+    private static final Path DONE_DIR = Paths.get("data/done");
+    private static final Path ERROR_DIR = Paths.get("data/error");
 
     /**
      * Загружает данные из CSV файла в ClickHouse
      *
      * @param file файл CSV для загрузки
-     * @return количество загруженных записей
+     * @return объект FileUpload с результатом загрузки
      */
-    public int processCsvFile(File file) {
+    @Transactional
+    public FileUpload processCsvFile(File file) {
         log.info("Начало обработки файла: {}", file.getName());
         
-        List<Transaction> transactions = new ArrayList<>();
+        // Создаем запись о загрузке файла
+        FileUpload fileUpload = new FileUpload();
+        fileUpload.setId(UUID.randomUUID());
+        fileUpload.setFileName(file.getName());
+        fileUpload.setFileSize(file.length());
+        fileUpload.setStatus("PROCESSING");
+        fileUpload.setCreatedAt(LocalDateTime.now());
+        fileUpload.setUpdatedAt(LocalDateTime.now());
+        fileUpload = fileUploadRepository.save(fileUpload);
         
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            // Пропускаем заголовок
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                log.error("Файл {} пуст", file.getName());
-                return 0;
-            }
+        try {
+            List<Transaction> transactions = new ArrayList<>();
             
-            log.info("Заголовок CSV: {}", headerLine);
-            
-            // Читаем данные
-            String line;
-            int lineNumber = 1;
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                try {
-                    Transaction transaction = Transaction.fromCsvLine(line, file.getName());
-                    transactions.add(transaction);
-                } catch (Exception e) {
-                    log.error("Ошибка в строке {}: {}", lineNumber, e.getMessage());
+            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                // Пропускаем заголовок
+                String headerLine = reader.readLine();
+                if (headerLine == null) {
+                    throw new IOException("Файл пуст");
+                }
+                
+                log.info("Заголовок CSV: {}", headerLine);
+                
+                // Читаем данные
+                String line;
+                int lineNumber = 1;
+                while ((line = reader.readLine()) != null) {
+                    lineNumber++;
+                    try {
+                        Transaction transaction = Transaction.fromCsvLine(line, fileUpload.getId());
+                        transactions.add(transaction);
+                    } catch (Exception e) {
+                        log.error("Ошибка в строке {}: {}", lineNumber, e.getMessage());
+                    }
+                }
+                
+                log.info("Прочитано {} транзакций из файла {}", transactions.size(), file.getName());
+                
+                // Загружаем данные в ClickHouse
+                if (!transactions.isEmpty()) {
+                    int recordsProcessed = clickHouseService.saveTransactions(transactions, fileUpload.getId());
+                    
+                    // Обновляем статус загрузки
+                    fileUpload.setStatus("COMPLETED");
+                    fileUpload.setRecordsProcessed(recordsProcessed);
+                    fileUpload.setUpdatedAt(LocalDateTime.now());
+                    fileUpload = fileUploadRepository.save(fileUpload);
+                    
+                    // Перемещаем файл в директорию успешных загрузок
+                    moveFile(file, DONE_DIR);
+                    
+                    return fileUpload;
+                } else {
+                    throw new IOException("Нет данных для загрузки");
                 }
             }
+        } catch (Exception e) {
+            log.error("Ошибка при обработке файла {}: {}", file.getName(), e.getMessage());
             
-            log.info("Прочитано {} транзакций из файла {}", transactions.size(), file.getName());
+            // Обновляем статус загрузки с ошибкой
+            fileUpload.setStatus("ERROR");
+            fileUpload.setErrorMessage(e.getMessage());
+            fileUpload.setUpdatedAt(LocalDateTime.now());
+            fileUpload = fileUploadRepository.save(fileUpload);
             
-            // Загружаем данные в ClickHouse
-            if (!transactions.isEmpty()) {
-                return clickHouseService.saveTransactions(transactions, file.getName());
-            }
-            
-        } catch (IOException e) {
-            log.error("Ошибка при чтении файла {}: {}", file.getName(), e.getMessage());
+            // Перемещаем файл в директорию ошибок
+            moveFile(file, ERROR_DIR);
         }
         
-        return 0;
+        return fileUpload;
     }
 
     /**
      * Загружает данные из CSV файла в ClickHouse
      *
      * @param path путь к файлу CSV
-     * @return количество загруженных записей
+     * @return объект FileUpload с результатом загрузки
      */
-    public int processCsvFile(Path path) {
+    @Transactional
+    public FileUpload processCsvFile(Path path) {
         return processCsvFile(path.toFile());
+    }
+    
+    /**
+     * Перемещает файл в указанную директорию
+     */
+    private void moveFile(File file, Path targetDir) {
+        try {
+            // Создаем директорию, если ее нет
+            if (!Files.exists(targetDir)) {
+                Files.createDirectories(targetDir);
+            }
+            
+            // Перемещаем файл
+            Path target = targetDir.resolve(file.getName());
+            Files.move(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+            log.info("Файл {} перемещен в {}", file.getName(), targetDir);
+        } catch (IOException e) {
+            log.error("Ошибка при перемещении файла {}: {}", file.getName(), e.getMessage());
+        }
     }
 } 

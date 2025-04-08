@@ -1,45 +1,40 @@
 package com.quantum.ra.config;
 
-import com.clickhouse.client.ClickHouseClient;
-import com.clickhouse.client.ClickHouseCredentials;
-import com.clickhouse.client.ClickHouseNode;
-import com.clickhouse.client.ClickHouseProtocol;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import ru.yandex.clickhouse.ClickHouseDataSource;
+import ru.yandex.clickhouse.settings.ClickHouseProperties;
 
+import javax.sql.DataSource;
+
+/**
+ * Конфигурация подключения к ClickHouse
+ */
 @Configuration
-@RequiredArgsConstructor
 public class ClickHouseConfig {
 
-    @Value("${clickhouse.host:localhost}")
-    private String host;
-
-    @Value("${clickhouse.port:8124}")
-    private int port;
-
-    @Value("${clickhouse.database:ra_analytics}")
-    private String database;
+    @Value("${clickhouse.url:jdbc:clickhouse://localhost:8123/ra_analytics}")
+    private String clickhouseUrl;
 
     @Value("${clickhouse.username:default}")
-    private String username;
+    private String clickhouseUsername;
 
-    @Value("${clickhouse.password:clickhouse}")
-    private String password;
+    @Value("${clickhouse.password:}")
+    private String clickhousePassword;
 
-    @Bean(destroyMethod = "close")
-    public ClickHouseClient clickHouseClient() {
-        return ClickHouseClient.newInstance();
-    }
-
-    @Bean
-    public ClickHouseNode clickHouseNode() {
-        return ClickHouseNode.builder()
-                .host(host)
-                .port(ClickHouseProtocol.HTTP, port)
-                .database(database)
-                .credentials(ClickHouseCredentials.fromUserAndPassword(username, password))
-                .build();
+    /**
+     * Создает бин источника данных ClickHouse
+     */
+    @Bean(name = "clickHouseDataSource")
+    public DataSource clickHouseDataSource() {
+        ClickHouseProperties properties = new ClickHouseProperties();
+        properties.setUser(clickhouseUsername);
+        properties.setPassword(clickhousePassword);
+        properties.setSocketTimeout(30000);
+        properties.setConnectionTimeout(50000);
+        
+        return new ClickHouseDataSource(clickhouseUrl, properties);
     }
 } 

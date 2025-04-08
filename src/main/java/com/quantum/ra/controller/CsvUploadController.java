@@ -1,5 +1,6 @@
 package com.quantum.ra.controller;
 
+import com.quantum.ra.model.FileUpload;
 import com.quantum.ra.service.CsvService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,15 +12,15 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * Контроллер для ручной загрузки CSV файлов
+ * REST контроллер для загрузки CSV файлов
  */
 @Slf4j
 @RestController
@@ -30,56 +31,60 @@ public class CsvUploadController {
     private final CsvService csvService;
 
     /**
-     * Загружает CSV файл и обрабатывает его
-     *
-     * @param file загруженный файл
-     * @return результат обработки
+     * Эндпоинт для загрузки CSV файлов
+     * 
+     * @param file загружаемый файл
+     * @return результат загрузки
      */
     @PostMapping("/csv")
-    public ResponseEntity<Map<String, Object>> uploadCsv(@RequestParam("file") MultipartFile file) {
-        log.info("Получен файл для загрузки: {}, размер: {}", file.getOriginalFilename(), file.getSize());
+    public ResponseEntity<Map<String, Object>> uploadCsvFile(@RequestParam("file") MultipartFile file) {
+        log.info("Получен запрос на загрузку файла: {}, размер: {}", file.getOriginalFilename(), file.getSize());
         
         Map<String, Object> response = new HashMap<>();
         
+        // Проверяем, что файл не пустой и имеет расширение CSV
         if (file.isEmpty()) {
             response.put("success", false);
             response.put("message", "Файл пуст");
             return ResponseEntity.badRequest().body(response);
         }
         
-        // Проверяем расширение файла
-        String fileName = file.getOriginalFilename();
-        if (fileName == null || !fileName.toLowerCase().endsWith(".csv")) {
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
             response.put("success", false);
-            response.put("message", "Поддерживаются только файлы CSV");
+            response.put("message", "Неверный формат файла. Ожидается CSV");
             return ResponseEntity.badRequest().body(response);
         }
         
         try {
-            // Сохраняем файл во временную директорию
-            Path tempDir = Files.createTempDirectory("csv-upload");
-            File tempFile = new File(tempDir.toFile(), fileName);
-            
-            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-                fos.write(file.getBytes());
-            }
+            // Сохраняем файл временно для обработки
+            String tempFilename = UUID.randomUUID() + "_" + filename;
+            Path tempPath = Files.createTempFile("csv_upload_", tempFilename);
+            file.transferTo(tempPath);
             
             // Обрабатываем файл
-            int processedRecords = csvService.processCsvFile(tempFile);
+            FileUpload fileUpload = csvService.processCsvFile(tempPath);
             
-            response.put("success", true);
-            response.put("fileName", fileName);
-            response.put("size", file.getSize());
-            response.put("recordsProcessed", processedRecords);
+            // Удаляем временный файл
+            Files.deleteIfExists(tempPath);
+            
+            // Формируем ответ
+            response.put("success", "COMPLETED".equals(fileUpload.getStatus()));
+            response.put("fileId", fileUpload.getId().toString());
+            response.put("status", fileUpload.getStatus());
+            response.put("recordsProcessed", fileUpload.getRecordsProcessed());
+            
+            if ("ERROR".equals(fileUpload.getStatus())) {
+                response.put("errorMessage", fileUpload.getErrorMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
             
             return ResponseEntity.ok(response);
             
         } catch (IOException e) {
-            log.error("Ошибка при обработке файла: {}", e.getMessage());
-            
+            log.error("Ошибка при обработке загруженного файла: {}", e.getMessage());
             response.put("success", false);
             response.put("message", "Ошибка при обработке файла: " + e.getMessage());
-            
             return ResponseEntity.internalServerError().body(response);
         }
     }

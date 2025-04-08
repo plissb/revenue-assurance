@@ -106,17 +106,17 @@ public class Transaction {
     private String txnmode;
     
     // Метаданные загрузки
-    private String fileName;
+    private UUID fileUploadId;
     private LocalDateTime loadTimestamp;
     
     /**
      * Фабричный метод для создания объекта Transaction из строки CSV
      * 
      * @param csvLine строка CSV с данными
-     * @param fileName имя файла, из которого загружается транзакция
+     * @param fileUploadId идентификатор загружаемого файла
      * @return объект Transaction
      */
-    public static Transaction fromCsvLine(String csvLine, String fileName) {
+    public static Transaction fromCsvLine(String csvLine, UUID fileUploadId) {
         String[] values = csvLine.split("\\|", -1);
         DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -213,7 +213,7 @@ public class Transaction {
         }
         
         // Устанавливаем метаданные загрузки
-        transaction.setFileName(fileName);
+        transaction.setFileUploadId(fileUploadId);
         transaction.setLoadTimestamp(LocalDateTime.now());
         
         return transaction;

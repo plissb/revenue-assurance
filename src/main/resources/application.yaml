@@ -16,7 +16,9 @@ spring:
     change-log: classpath:/db/changelog/db.changelog-master.yaml
 
 clickhouse:
-  url: jdbc:clickhouse://localhost:8124/ra_analytics
+  host: localhost
+  port: 8124
+  database: ra_analytics
   username: default
   password: clickhouse
   

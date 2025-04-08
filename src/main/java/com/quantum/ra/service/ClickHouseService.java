@@ -1,79 +1,83 @@
 package com.quantum.ra.service;
 
+import com.clickhouse.client.ClickHouseClient;
+import com.clickhouse.client.ClickHouseFormat;
+import com.clickhouse.client.ClickHouseNode;
+import com.clickhouse.client.ClickHouseRequest;
+import com.clickhouse.client.ClickHouseResponse;
+import com.clickhouse.data.ClickHouseDataStreamFactory;
+import com.clickhouse.data.ClickHouseOutputStream;
+import com.clickhouse.data.ClickHouseWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClickHouseService {
 
-    @Qualifier("clickHouseDataSource")
-    private final DataSource clickHouseDataSource;
+    private final ClickHouseClient clickHouseClient;
+    private final ClickHouseNode clickHouseNode;
 
     /**
-     * Сохраняет транзакции в ClickHouse
-     * 
+     * Сохраняет транзакции в ClickHouse используя бинарный формат
+     *
      * @param transactions список транзакций для сохранения
      * @param fileName имя исходного файла
      * @return количество сохраненных записей
      */
     public int saveTransactions(List<Object> transactions, String fileName) {
-        String sql = "INSERT INTO ra_analytics.transactions " +
-                "(id, sender_msisdn, receiver_msisdn, receiver_user_id, sender_user_id, " +
-                "transaction_amount, commissions_paid, commissions_received, commissions_others, " +
-                "service_charge_received, service_charge_paid, taxes, service_type, transfer_status, " +
-                "sender_pre_bal, sender_post_bal, receiver_pre_bal, receiver_post_bal, " +
-                "sender_acc_status, receiver_acc_status, error_code, error_desc, reference_number, " +
-                // ... остальные поля
-                "file_name, load_timestamp) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-                // ... значения для остальных полей
-                "?, ?)";
+        String sql = "INSERT INTO ra_analytics.transactions FORMAT Binary";
 
-        try (Connection connection = clickHouseDataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (ClickHouseClient client = clickHouseClient) {
+            int[] count = {0};  // Используем массив, чтобы изменять в лямбде
+            
+            ClickHouseResponse response = client.connect(clickHouseNode)
+                    .format(ClickHouseFormat.Binary)
+                    .query(sql)
+                    .execute()
+                    .thenApply(resp -> {
+                        try (ClickHouseWriter writer = resp.getWriter()) {
+                            for (Object transaction : transactions) {
+                                // Здесь будет заполнение данных конкретного объекта
+                                // Необходимо адаптировать под ваш класс транзакции
+                                UUID id = UUID.randomUUID();
+                                writer.writeUuid(id);
+                                
+                                // Пример заполнения строковых полей (закомментировано, т.к. нет класса Transaction)
+                                // writer.writeString(transaction.getSenderMsisdn());
+                                // writer.writeString(transaction.getReceiverMsisdn());
+                                
+                                // ... Все остальные поля таблицы
+                                
+                                // Метаданные
+                                writer.writeString(fileName);
+                                writer.writeDateTime64(LocalDateTime.now(), 3);
+                                
+                                count[0]++;
+                            }
+                            return resp;
+                        } catch (IOException e) {
+                            log.error("Error writing to ClickHouse: ", e);
+                            throw new RuntimeException("Error writing to ClickHouse", e);
+                        }
+                    }).get();
+            
+            long rowsWritten = response.getSummary().getWrittenRows();
+            log.info("Successfully loaded {} rows into ClickHouse", rowsWritten);
+            return count[0];
 
-            int batchSize = 0;
-            for (Object transaction : transactions) {
-                // TODO: Заполнение полей PreparedStatement на основе объекта transaction
-                // Пример:
-                // statement.setObject(1, UUID.randomUUID());
-                // statement.setString(2, transaction.getSenderMsisdn());
-                // ...
-                
-                // Добавляем метаданные загрузки
-                statement.setString(24, fileName);
-                statement.setObject(25, LocalDateTime.now());
-                
-                statement.addBatch();
-                batchSize++;
-                
-                // Выполняем пакетную вставку каждые 1000 записей
-                if (batchSize % 1000 == 0) {
-                    statement.executeBatch();
-                }
-            }
-            
-            // Выполняем оставшиеся записи
-            if (batchSize % 1000 != 0) {
-                statement.executeBatch();
-            }
-            
-            return batchSize;
-        } catch (SQLException e) {
-            log.error("Ошибка при сохранении данных в ClickHouse", e);
-            throw new RuntimeException("Ошибка при сохранении данных в ClickHouse", e);
+        } catch (ExecutionException | InterruptedException e) {
+            log.error("Error saving data to ClickHouse: ", e);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Error saving data to ClickHouse", e);
         }
     }
 } 

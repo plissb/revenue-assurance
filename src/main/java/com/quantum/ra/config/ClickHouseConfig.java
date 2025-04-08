@@ -1,34 +1,45 @@
 package com.quantum.ra.config;
 
+import com.clickhouse.client.ClickHouseClient;
+import com.clickhouse.client.ClickHouseCredentials;
+import com.clickhouse.client.ClickHouseNode;
+import com.clickhouse.client.ClickHouseProtocol;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
-
-import javax.sql.DataSource;
-import java.util.Properties;
 
 @Configuration
 @RequiredArgsConstructor
 public class ClickHouseConfig {
 
-    @Value("${clickhouse.url}")
-    private String url;
+    @Value("${clickhouse.host:localhost}")
+    private String host;
 
-    @Value("${clickhouse.username}")
+    @Value("${clickhouse.port:8124}")
+    private int port;
+
+    @Value("${clickhouse.database:ra_analytics}")
+    private String database;
+
+    @Value("${clickhouse.username:default}")
     private String username;
 
-    @Value("${clickhouse.password}")
+    @Value("${clickhouse.password:clickhouse}")
     private String password;
 
-    @Bean(name = "clickHouseDataSource")
-    public DataSource clickHouseDataSource() {
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName("com.clickhouse.jdbc.ClickHouseDriver");
-        dataSource.setUrl(url);
-        dataSource.setUsername(username);
-        dataSource.setPassword(password);
-        return dataSource;
+    @Bean(destroyMethod = "close")
+    public ClickHouseClient clickHouseClient() {
+        return ClickHouseClient.newInstance();
+    }
+
+    @Bean
+    public ClickHouseNode clickHouseNode() {
+        return ClickHouseNode.builder()
+                .host(host)
+                .port(ClickHouseProtocol.HTTP, port)
+                .database(database)
+                .credentials(ClickHouseCredentials.fromUserAndPassword(username, password))
+                .build();
     }
 } 

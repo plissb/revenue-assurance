@@ -1,0 +1,110 @@
+<head xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+    <title id="pageTitle">File Details | Revenue Assurance</title>
+    <th:block layout:fragment="headAdditions"></th:block>
+</head>
+<body>
+    <div layout:fragment="content" class="container main-content">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">File Details</h5>
+                <a href="/files" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> Back to list
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h6 class="mb-0">File Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <th style="width: 150px;">Filename:</th>
+                                        <td><strong th:text="${file.fileName}"></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <th>ID:</th>
+                                        <td><code th:text="${file.id}"></code></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Size:</th>
+                                        <td th:text="${#numbers.formatDecimal(file.fileSize / 1024, 0, 'COMMA', 2, 'POINT')} + ' KB'"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td>
+                                            <span class="badge" 
+                                                  th:classappend="${file.status == 'COMPLETED' ? 'bg-completed' : (file.status == 'ERROR' ? 'bg-error' : (file.status == 'PROCESSING' ? 'bg-processing' : 'bg-pending'))}"
+                                                  th:text="${file.status}"></span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Upload date:</th>
+                                        <td th:text="${#temporals.format(file.createdAt, 'dd.MM.yyyy HH:mm:ss')}"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Update date:</th>
+                                        <td th:text="${#temporals.format(file.updatedAt, 'dd.MM.yyyy HH:mm:ss')}"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h6 class="mb-0">Processing Statistics</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="display-4 fw-bold" th:text="${file.recordsProcessed != null ? file.recordsProcessed : '0'}"></div>
+                                    <div class="text-muted">Records processed</div>
+                                </div>
+                                
+                                <div th:if="${file.status == 'ERROR'}" class="alert alert-danger">
+                                    <h6 class="alert-heading">Error processing file</h6>
+                                    <p th:text="${file.errorMessage}"></p>
+                                </div>
+                                
+                                <div th:if="${file.status == 'COMPLETED'}" class="alert alert-success">
+                                    <h6 class="alert-heading">File successfully processed</h6>
+                                    <p>All records were successfully loaded into the database.</p>
+                                </div>
+                                
+                                <div th:if="${file.status == 'PROCESSING'}" class="alert alert-primary">
+                                    <h6 class="alert-heading">File is being processed</h6>
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 75%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-4" th:if="${file.status == 'COMPLETED'}">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary" disabled>
+                                    <i class="bi bi-eye"></i> View Data
+                                </button>
+                                <button class="btn btn-outline-success" disabled>
+                                    <i class="bi bi-download"></i> Export Results
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <th:block layout:fragment="scriptAdditions"></th:block>
+</body>

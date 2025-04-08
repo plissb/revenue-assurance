@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" class="h-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:replace="~{::#pageTitle}">Fallback Title</title>
+    <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+    <!-- Using local icons -->
+    <link th:href="@{/css/bootstrap-icons.css}" rel="stylesheet">
+    <style>
+        /* Basic styles */
+        html, body {
+            height: 100%;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            padding-top: 0;
+            background-color: #e9ecef;
+        }
+        .main-content {
+             flex: 1 0 auto;
+             padding-top: 1.5rem;
+             padding-bottom: 1.5rem;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 1.5rem;
+            border: none;
+        }
+        .alert {
+            margin-bottom: 1.5rem;
+        }
+        /* Increase specificity and check rules */
+        .table thead th[sortable] {
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px; /* Add space for icon */
+        }
+        .table thead th[sortable]::after {
+            content: "";
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 5px solid #aaa;
+            opacity: 0.3;
+        }
+        .table thead th[sortable].asc::after {
+            border-bottom: 5px solid #000;
+            opacity: 1;
+        }
+        .table thead th[sortable].desc::after {
+            border-bottom: none;
+            border-top: 5px solid #000;
+            opacity: 1;
+        }
+        .badge.bg-completed {
+            background-color: #198754 !important; /* Add !important just in case */
+        }
+        .badge.bg-error {
+            background-color: #dc3545 !important;
+        }
+        .badge.bg-processing {
+            background-color: #0d6efd !important;
+        }
+        .badge.bg-pending {
+            background-color: #ffc107 !important;
+            color: #212529 !important; /* Make sure text is dark */
+        }
+        /* Add style for badge width alignment */
+        .table .badge {
+            min-width: 110px; /* Adjust value as needed */
+            text-align: center; /* Center text and icon inside */
+        }
+        .footer {
+          background-color: #f8f9fa;
+          color: #6c757d;
+          font-size: 0.9em;
+        }
+    </style>
+</head>
+<body class="d-flex flex-column">
+    <!-- NAVBAR REMOVED -->
+    <!-- 
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top"> 
+        ...
+    </nav> 
+    -->
+
+    <!-- Main content insertion point (WITHOUT container) -->
+    <div layout:fragment="content">
+        <!-- Alerts removed from here -->
+        <!-- (Empty, as layout:fragment will replace this div entirely) -->
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-light"></footer>
+
+    <script th:src="@{/js/bootstrap.bundle.min.js}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+</body>
+</html>

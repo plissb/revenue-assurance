@@ -1,0 +1,139 @@
+<head xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+    <title id="pageTitle">File Upload | Revenue Assurance</title>
+    <th:block layout:fragment="headAdditions">
+        <style>
+            .upload-area {
+                border: 2px dashed #ddd;
+                border-radius: 8px;
+                padding: 2rem;
+                text-align: center;
+                transition: all 0.3s;
+                background-color: #f8f9fa;
+            }
+            .upload-area:hover, .upload-area.active {
+                border-color: #0d6efd;
+                background-color: #f0f7ff;
+            }
+            .upload-icon {
+                font-size: 3rem;
+                color: #6c757d;
+                margin-bottom: 1rem;
+            }
+            #file-name {
+                margin-top: 1rem;
+                font-weight: bold;
+            }
+        </style>
+    </th:block>
+</head>
+<body>
+    <div layout:fragment="content" class="container main-content">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">File Upload</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/files/upload" enctype="multipart/form-data" id="upload-form">
+                    <div class="mb-4">
+                        <div class="upload-area" id="drop-area">
+                            <i class="bi bi-cloud-arrow-up upload-icon"></i>
+                            <h4>Drag file here or click to browse</h4>
+                            <p class="text-muted">Supported formats: CSV</p>
+                            <input type="file" name="file" id="file-input" class="d-none" accept=".csv" aria-label="File upload">
+                            <div id="file-name"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="/files" class="btn btn-secondary me-md-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary" id="upload-button" disabled>
+                            <i class="bi bi-upload"></i> Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer">
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-2"></i> The file must be in CSV format and contain the necessary fields for transaction processing.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <th:block layout:fragment="scriptAdditions">
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const dropArea = document.getElementById('drop-area');
+                const fileInput = document.getElementById('file-input');
+                const fileName = document.getElementById('file-name');
+                const uploadButton = document.getElementById('upload-button');
+                
+                // Open file selection dialog when clicking on the area
+                dropArea.addEventListener('click', function() {
+                    fileInput.click();
+                });
+                
+                // Display the name of the selected file
+                fileInput.addEventListener('change', function() {
+                    updateFileInfo();
+                });
+                
+                // Handle file drag and drop
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, highlight, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropArea.addEventListener(eventName, unhighlight, false);
+                });
+                
+                dropArea.addEventListener('drop', handleDrop, false);
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                function highlight() {
+                    dropArea.classList.add('active');
+                }
+                
+                function unhighlight() {
+                    dropArea.classList.remove('active');
+                }
+                
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    
+                    fileInput.files = files;
+                    updateFileInfo();
+                }
+                
+                function updateFileInfo() {
+                    if (fileInput.files && fileInput.files[0]) {
+                        const file = fileInput.files[0];
+                        
+                        if (!file.name.toLowerCase().endsWith('.csv')) {
+                            fileName.innerHTML = '<div class="text-danger">Invalid file format. CSV expected</div>';
+                            uploadButton.disabled = true;
+                            return;
+                        }
+                        
+                        const fileSize = (file.size / 1024).toFixed(2) + ' KB';
+                        fileName.innerHTML = `<div class="text-success">${file.name} (${fileSize})</div>`;
+                        uploadButton.disabled = false;
+                    } else {
+                        fileName.textContent = '';
+                        uploadButton.disabled = true;
+                    }
+                }
+            });
+        </script>
+    </th:block>
+</body>

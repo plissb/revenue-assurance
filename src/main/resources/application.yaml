@@ -31,7 +31,7 @@ server:
 
 # Настройки для ClickHouse
 clickhouse:
-  url: jdbc:clickhouse://localhost:8123/ra_analytics
+  url: jdbc:clickhouse://localhost:8124/ra_analytics
   username: default
   password:
   database: ra_analytics
@@ -44,5 +44,5 @@ app:
     done-dir: data/done
     error-dir: data/error
     file-pattern: "*.csv"
-    interval: 60000
+    interval: 1000
     enabled: true 

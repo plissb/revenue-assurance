@@ -35,9 +35,9 @@ public class FileWatcherService {
     private boolean enabled;
 
     /**
-     * Запускается каждую минуту для проверки новых файлов
+     * Запускается каждую секунду для проверки новых файлов
      */
-    @Scheduled(fixedDelayString = "${app.file-watcher.interval:60000}")
+    @Scheduled(fixedDelayString = "${app.file-watcher.interval:1000}")
     public void checkNewFiles() {
         if (!enabled) {
             return;

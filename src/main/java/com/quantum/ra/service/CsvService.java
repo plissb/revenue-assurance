@@ -101,7 +101,7 @@ public class CsvService {
                     if (clickHouseService != null && clickhouseEnabled) {
                         recordsProcessed = clickHouseService.saveTransactions(transactions, fileUpload.getId());
                     } else {
-                        log.info("ClickHouse недоступен, данные не будут загружены");
+                        log.error("ClickHouse недоступен, данные не будут загружены");
                         recordsProcessed = transactions.size(); // Считаем все записи обработанными
                     }
                     

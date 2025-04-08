@@ -6,7 +6,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -14,7 +17,8 @@ import java.util.UUID;
 /**
  * Модель для хранения информации о загруженных файлах
  */
-@Data
+@Getter
+@Setter
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
@@ -22,6 +26,7 @@ import java.util.UUID;
 public class FileUpload {
     
     @Id
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
     private UUID id;
     
     @Column(nullable = false)

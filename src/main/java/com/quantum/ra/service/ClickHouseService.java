@@ -1,39 +1,39 @@
 package com.quantum.ra.service;
 
+import com.clickhouse.jdbc.ClickHouseConnection;
+import com.clickhouse.jdbc.ClickHouseDataSource;
 import com.quantum.ra.model.Transaction;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
-import java.math.BigDecimal;
-import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Сервис для работы с ClickHouse
+ */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "clickhouse.enabled", havingValue = "true", matchIfMissing = true)
 public class ClickHouseService {
 
-    private final DataSource clickHouseDataSource;
+    private final ClickHouseDataSource dataSource;
 
-    public ClickHouseService(@Qualifier("clickHouseDataSource") DataSource clickHouseDataSource) {
-        this.clickHouseDataSource = clickHouseDataSource;
-        log.info("ClickHouseService initialized");
+    @Autowired
+    public ClickHouseService(ClickHouseDataSource dataSource) {
+        this.dataSource = dataSource;
+        log.info("ClickHouseService initialized with JDBC driver");
     }
 
     /**
-     * Сохраняет транзакции в ClickHouse через JDBC
+     * Сохраняет транзакции в ClickHouse используя JDBC
      *
      * @param transactions список транзакций для сохранения
      * @param fileUploadId идентификатор загружаемого файла
@@ -44,191 +44,166 @@ public class ClickHouseService {
             return 0;
         }
 
-        String sql = buildBatchInsertQuery();
-        
-        try (Connection connection = clickHouseDataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            
-            for (Transaction transaction : transactions) {
-                addTransactionParams(statement, transaction, fileUploadId);
-                statement.addBatch();
-            }
-            
-            int[] results = statement.executeBatch();
-            int totalRows = 0;
-            for (int result : results) {
-                if (result > 0) {
-                    totalRows += result;
-                }
-            }
-            
-            log.info("Successfully loaded {} rows into ClickHouse", totalRows);
-            return totalRows;
-            
-        } catch (SQLException e) {
-            log.error("Error saving data to ClickHouse: ", e);
-            throw new RuntimeException("Error saving data to ClickHouse: " + e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * Строит SQL-запрос на массовую вставку данных
-     */
-    private String buildBatchInsertQuery() {
-        return "INSERT INTO ra_analytics.transactions (" +
+        String sql = "INSERT INTO ra_analytics.transactions (" +
                 "id, sender_msisdn, receiver_msisdn, receiver_user_id, sender_user_id, " +
                 "transaction_amount, commissions_paid, commissions_received, commissions_others, " +
                 "service_charge_received, service_charge_paid, taxes, service_type, transfer_status, " +
                 "sender_pre_bal, sender_post_bal, receiver_pre_bal, receiver_post_bal, " +
                 "sender_acc_status, receiver_acc_status, error_code, error_desc, reference_number, " +
-                "created_on, created_by, modified_on, modified_by, app_1_date, app_2_date, " +
-                "transfer_id, transfer_datetime, sender_category_code, sender_domain_code, " +
-                "sender_grade_name, sender_group_role, sender_designation, sender_state, " +
-                "receiver_category_code, receiver_domain_code, receiver_grade_name, " +
-                "receiver_group_role, receiver_designation, receiver_state, sender_city, " +
-                "receiver_city, app_1_by, app_2_by, request_source, gateway_type, " +
-                "transfer_subtype, payment_type, payment_number, payment_date, remarks, " +
-                "action_type, transaction_tag, reconciliation_by, reconciliation_for, " +
-                "ext_txn_number, original_ref_number, zebra_ambiguous, attempt_status, " +
-                "other_msisdn, sender_wallet_number, receiver_wallet_number, sender_user_name, " +
-                "receiver_user_name, tno_msisdn, tno_id, unreg_first_name, unreg_last_name, " +
-                "unreg_dob, unreg_id_number, bulk_payout_batchid, is_financial, transfer_done, " +
-                "initiator_msisdn, validator_msisdn, initiator_comments, validator_comments, " +
-                "sender_wallet_name, reciever_wallet_name, sender_user_type, receiver_user_type, " +
-                "txnmode, file_upload_id, load_timestamp) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    }
-    
-    /**
-     * Добавляет параметры транзакции в SQL-запрос
-     */
-    private void addTransactionParams(PreparedStatement statement, Transaction transaction, UUID fileUploadId) 
-            throws SQLException {
-        int index = 1;
-        
-        // UUID -> String в ClickHouse
-        statement.setString(index++, transaction.getId().toString());
-        statement.setString(index++, transaction.getSenderMsisdn());
-        statement.setString(index++, transaction.getReceiverMsisdn());
-        statement.setString(index++, transaction.getReceiverUserId());
-        statement.setString(index++, transaction.getSenderUserId());
-        setDecimal(statement, index++, transaction.getTransactionAmount());
-        setDecimal(statement, index++, transaction.getCommissionsPaid());
-        setDecimal(statement, index++, transaction.getCommissionsReceived());
-        setDecimal(statement, index++, transaction.getCommissionsOthers());
-        setDecimal(statement, index++, transaction.getServiceChargeReceived());
-        setDecimal(statement, index++, transaction.getServiceChargePaid());
-        setDecimal(statement, index++, transaction.getTaxes());
-        statement.setString(index++, transaction.getServiceType());
-        statement.setString(index++, transaction.getTransferStatus());
-        setDecimal(statement, index++, transaction.getSenderPreBal());
-        setDecimal(statement, index++, transaction.getSenderPostBal());
-        setDecimal(statement, index++, transaction.getReceiverPreBal());
-        setDecimal(statement, index++, transaction.getReceiverPostBal());
-        statement.setString(index++, transaction.getSenderAccStatus());
-        statement.setString(index++, transaction.getReceiverAccStatus());
-        statement.setString(index++, transaction.getErrorCode());
-        statement.setString(index++, transaction.getErrorDesc());
-        statement.setString(index++, transaction.getReferenceNumber());
-        setDateTime(statement, index++, transaction.getCreatedOn());
-        statement.setString(index++, transaction.getCreatedBy());
-        setDateTime(statement, index++, transaction.getModifiedOn());
-        statement.setString(index++, transaction.getModifiedBy());
-        setDateTime(statement, index++, transaction.getApp1Date());
-        setDateTime(statement, index++, transaction.getApp2Date());
-        statement.setString(index++, transaction.getTransferId());
-        setDateTime(statement, index++, transaction.getTransferDatetime());
-        statement.setString(index++, transaction.getSenderCategoryCode());
-        statement.setString(index++, transaction.getSenderDomainCode());
-        statement.setString(index++, transaction.getSenderGradeName());
-        statement.setString(index++, transaction.getSenderGroupRole());
-        statement.setString(index++, transaction.getSenderDesignation());
-        statement.setString(index++, transaction.getSenderState());
-        statement.setString(index++, transaction.getReceiverCategoryCode());
-        statement.setString(index++, transaction.getReceiverDomainCode());
-        statement.setString(index++, transaction.getReceiverGradeName());
-        statement.setString(index++, transaction.getReceiverGroupRole());
-        statement.setString(index++, transaction.getReceiverDesignation());
-        statement.setString(index++, transaction.getReceiverState());
-        statement.setString(index++, transaction.getSenderCity());
-        statement.setString(index++, transaction.getReceiverCity());
-        statement.setString(index++, transaction.getApp1By());
-        statement.setString(index++, transaction.getApp2By());
-        statement.setString(index++, transaction.getRequestSource());
-        statement.setString(index++, transaction.getGatewayType());
-        statement.setString(index++, transaction.getTransferSubtype());
-        statement.setString(index++, transaction.getPaymentType());
-        statement.setString(index++, transaction.getPaymentNumber());
-        setDateTime(statement, index++, transaction.getPaymentDate());
-        statement.setString(index++, transaction.getRemarks());
-        statement.setString(index++, transaction.getActionType());
-        statement.setString(index++, transaction.getTransactionTag());
-        statement.setString(index++, transaction.getReconciliationBy());
-        statement.setString(index++, transaction.getReconciliationFor());
-        statement.setString(index++, transaction.getExtTxnNumber());
-        statement.setString(index++, transaction.getOriginalRefNumber());
-        statement.setString(index++, transaction.getZebraAmbiguous());
-        statement.setString(index++, transaction.getAttemptStatus());
-        statement.setString(index++, transaction.getOtherMsisdn());
-        statement.setString(index++, transaction.getSenderWalletNumber());
-        statement.setString(index++, transaction.getReceiverWalletNumber());
-        statement.setString(index++, transaction.getSenderUserName());
-        statement.setString(index++, transaction.getReceiverUserName());
-        statement.setString(index++, transaction.getTnoMsisdn());
-        statement.setString(index++, transaction.getTnoId());
-        statement.setString(index++, transaction.getUnregFirstName());
-        statement.setString(index++, transaction.getUnregLastName());
-        setDate(statement, index++, transaction.getUnregDob());
-        statement.setString(index++, transaction.getUnregIdNumber());
-        statement.setString(index++, transaction.getBulkPayoutBatchid());
-        statement.setString(index++, transaction.getIsFinancial());
-        statement.setString(index++, transaction.getTransferDone());
-        statement.setString(index++, transaction.getInitiatorMsisdn());
-        statement.setString(index++, transaction.getValidatorMsisdn());
-        statement.setString(index++, transaction.getInitiatorComments());
-        statement.setString(index++, transaction.getValidatorComments());
-        statement.setString(index++, transaction.getSenderWalletName());
-        statement.setString(index++, transaction.getRecieverWalletName());
-        statement.setString(index++, transaction.getSenderUserType());
-        statement.setString(index++, transaction.getReceiverUserType());
-        statement.setString(index++, transaction.getTxnmode());
-        statement.setString(index++, fileUploadId.toString());
-        setDateTime(statement, index, transaction.getLoadTimestamp());
-    }
-    
-    /**
-     * Устанавливает BigDecimal в SQL-запрос
-     */
-    private void setDecimal(PreparedStatement statement, int index, BigDecimal value) throws SQLException {
-        if (value == null) {
-            statement.setNull(index, Types.DECIMAL);
-        } else {
-            statement.setBigDecimal(index, value);
+                "created_on, created_by, modified_on, modified_by, app1_date, app2_date, transfer_id, " +
+                "transfer_datetime, sender_category_code, sender_domain_code, sender_grade_name, " +
+                "sender_group_role, sender_designation, sender_state, receiver_category_code, " +
+                "receiver_domain_code, receiver_grade_name, receiver_group_role, receiver_designation, " +
+                "receiver_state, sender_city, receiver_city, app1_by, app2_by, request_source, " +
+                "gateway_type, transfer_subtype, payment_type, payment_number, payment_date, " +
+                "remarks, action_type, transaction_tag, reconciliation_by, reconciliation_for, " +
+                "ext_txn_number, original_ref_number, zebra_ambiguous, attempt_status, other_msisdn, " +
+                "sender_wallet_number, receiver_wallet_number, sender_user_name, receiver_user_name, " +
+                "tno_msisdn, tno_id, unreg_first_name, unreg_last_name, unreg_dob, unreg_id_number, " +
+                "bulk_payout_batchid, is_financial, transfer_done, initiator_msisdn, validator_msisdn, " +
+                "initiator_comments, validator_comments, sender_wallet_name, receiver_wallet_name, " +
+                "sender_user_type, receiver_user_type, txnmode, file_upload_id, load_timestamp) VALUES " +
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+                "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (ClickHouseConnection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            int batchSize = 0;
+            int totalInserted = 0;
+
+            for (Transaction transaction : transactions) {
+                int paramIndex = 1;
+                
+                setParam(ps, paramIndex++, transaction.getId());
+                setParam(ps, paramIndex++, transaction.getSenderMsisdn());
+                setParam(ps, paramIndex++, transaction.getReceiverMsisdn());
+                setParam(ps, paramIndex++, transaction.getReceiverUserId());
+                setParam(ps, paramIndex++, transaction.getSenderUserId());
+                setParam(ps, paramIndex++, transaction.getTransactionAmount());
+                setParam(ps, paramIndex++, transaction.getCommissionsPaid());
+                setParam(ps, paramIndex++, transaction.getCommissionsReceived());
+                setParam(ps, paramIndex++, transaction.getCommissionsOthers());
+                setParam(ps, paramIndex++, transaction.getServiceChargeReceived());
+                setParam(ps, paramIndex++, transaction.getServiceChargePaid());
+                setParam(ps, paramIndex++, transaction.getTaxes());
+                setParam(ps, paramIndex++, transaction.getServiceType());
+                setParam(ps, paramIndex++, transaction.getTransferStatus());
+                setParam(ps, paramIndex++, transaction.getSenderPreBal());
+                setParam(ps, paramIndex++, transaction.getSenderPostBal());
+                setParam(ps, paramIndex++, transaction.getReceiverPreBal());
+                setParam(ps, paramIndex++, transaction.getReceiverPostBal());
+                setParam(ps, paramIndex++, transaction.getSenderAccStatus());
+                setParam(ps, paramIndex++, transaction.getReceiverAccStatus());
+                setParam(ps, paramIndex++, transaction.getErrorCode());
+                setParam(ps, paramIndex++, transaction.getErrorDesc());
+                setParam(ps, paramIndex++, transaction.getReferenceNumber());
+                setParam(ps, paramIndex++, transaction.getCreatedOn());
+                setParam(ps, paramIndex++, transaction.getCreatedBy());
+                setParam(ps, paramIndex++, transaction.getModifiedOn());
+                setParam(ps, paramIndex++, transaction.getModifiedBy());
+                setParam(ps, paramIndex++, transaction.getApp1Date());
+                setParam(ps, paramIndex++, transaction.getApp2Date());
+                setParam(ps, paramIndex++, transaction.getTransferId());
+                setParam(ps, paramIndex++, transaction.getTransferDatetime());
+                setParam(ps, paramIndex++, transaction.getSenderCategoryCode());
+                setParam(ps, paramIndex++, transaction.getSenderDomainCode());
+                setParam(ps, paramIndex++, transaction.getSenderGradeName());
+                setParam(ps, paramIndex++, transaction.getSenderGroupRole());
+                setParam(ps, paramIndex++, transaction.getSenderDesignation());
+                setParam(ps, paramIndex++, transaction.getSenderState());
+                setParam(ps, paramIndex++, transaction.getReceiverCategoryCode());
+                setParam(ps, paramIndex++, transaction.getReceiverDomainCode());
+                setParam(ps, paramIndex++, transaction.getReceiverGradeName());
+                setParam(ps, paramIndex++, transaction.getReceiverGroupRole());
+                setParam(ps, paramIndex++, transaction.getReceiverDesignation());
+                setParam(ps, paramIndex++, transaction.getReceiverState());
+                setParam(ps, paramIndex++, transaction.getSenderCity());
+                setParam(ps, paramIndex++, transaction.getReceiverCity());
+                setParam(ps, paramIndex++, transaction.getApp1By());
+                setParam(ps, paramIndex++, transaction.getApp2By());
+                setParam(ps, paramIndex++, transaction.getRequestSource());
+                setParam(ps, paramIndex++, transaction.getGatewayType());
+                setParam(ps, paramIndex++, transaction.getTransferSubtype());
+                setParam(ps, paramIndex++, transaction.getPaymentType());
+                setParam(ps, paramIndex++, transaction.getPaymentNumber());
+                setParam(ps, paramIndex++, transaction.getPaymentDate());
+                setParam(ps, paramIndex++, transaction.getRemarks());
+                setParam(ps, paramIndex++, transaction.getActionType());
+                setParam(ps, paramIndex++, transaction.getTransactionTag());
+                setParam(ps, paramIndex++, transaction.getReconciliationBy());
+                setParam(ps, paramIndex++, transaction.getReconciliationFor());
+                setParam(ps, paramIndex++, transaction.getExtTxnNumber());
+                setParam(ps, paramIndex++, transaction.getOriginalRefNumber());
+                setParam(ps, paramIndex++, transaction.getZebraAmbiguous());
+                setParam(ps, paramIndex++, transaction.getAttemptStatus());
+                setParam(ps, paramIndex++, transaction.getOtherMsisdn());
+                setParam(ps, paramIndex++, transaction.getSenderWalletNumber());
+                setParam(ps, paramIndex++, transaction.getReceiverWalletNumber());
+                setParam(ps, paramIndex++, transaction.getSenderUserName());
+                setParam(ps, paramIndex++, transaction.getReceiverUserName());
+                setParam(ps, paramIndex++, transaction.getTnoMsisdn());
+                setParam(ps, paramIndex++, transaction.getTnoId());
+                setParam(ps, paramIndex++, transaction.getUnregFirstName());
+                setParam(ps, paramIndex++, transaction.getUnregLastName());
+                setParam(ps, paramIndex++, transaction.getUnregDob());
+                setParam(ps, paramIndex++, transaction.getUnregIdNumber());
+                setParam(ps, paramIndex++, transaction.getBulkPayoutBatchid());
+                setParam(ps, paramIndex++, transaction.getIsFinancial());
+                setParam(ps, paramIndex++, transaction.getTransferDone());
+                setParam(ps, paramIndex++, transaction.getInitiatorMsisdn());
+                setParam(ps, paramIndex++, transaction.getValidatorMsisdn());
+                setParam(ps, paramIndex++, transaction.getInitiatorComments());
+                setParam(ps, paramIndex++, transaction.getValidatorComments());
+                setParam(ps, paramIndex++, transaction.getSenderWalletName());
+                setParam(ps, paramIndex++, transaction.getRecieverWalletName());
+                setParam(ps, paramIndex++, transaction.getSenderUserType());
+                setParam(ps, paramIndex++, transaction.getReceiverUserType());
+                setParam(ps, paramIndex++, transaction.getTxnmode());
+                setParam(ps, paramIndex++, fileUploadId);
+                setParam(ps, paramIndex++, transaction.getLoadTimestamp());
+                
+                ps.addBatch();
+                batchSize++;
+                
+                // Выполняем батч каждые 10000 транзакций для оптимизации памяти
+                if (batchSize >= 10000) {
+                    int[] counts = ps.executeBatch();
+                    for (int count : counts) {
+                        totalInserted += count;
+                    }
+                    batchSize = 0;
+                }
+            }
+            
+            // Выполняем оставшийся батч
+            if (batchSize > 0) {
+                int[] counts = ps.executeBatch();
+                for (int count : counts) {
+                    totalInserted += count;
+                }
+            }
+            
+            log.info("Successfully inserted {} rows into ClickHouse", totalInserted);
+            return totalInserted;
+            
+        } catch (SQLException e) {
+            log.error("Error executing ClickHouse save operation: ", e);
+            throw new RuntimeException("Error saving data to ClickHouse", e);
         }
     }
     
     /**
-     * Устанавливает LocalDateTime в SQL-запрос
+     * Вспомогательный метод для установки параметров в PreparedStatement с учетом null-значений
      */
-    private void setDateTime(PreparedStatement statement, int index, LocalDateTime value) throws SQLException {
-        if (value == null) {
-            statement.setNull(index, Types.TIMESTAMP);
-        } else {
-            statement.setTimestamp(index, Timestamp.valueOf(value));
+    private void setParam(PreparedStatement ps, int index, Object value) throws SQLException {
+        switch (value) {
+            case null -> ps.setNull(index, java.sql.Types.NULL);
+            case UUID uuid -> ps.setString(index, value.toString());
+            case LocalDateTime localDateTime -> ps.setTimestamp(index, Timestamp.valueOf(localDateTime));
+            case LocalDate localDate -> ps.setDate(index, java.sql.Date.valueOf(localDate));
+            default -> ps.setObject(index, value);
         }
     }
-    
-    /**
-     * Устанавливает LocalDate в SQL-запрос
-     */
-    private void setDate(PreparedStatement statement, int index, LocalDate value) throws SQLException {
-        if (value == null) {
-            statement.setNull(index, Types.DATE);
-        } else {
-            statement.setDate(index, java.sql.Date.valueOf(value));
-        }
-    }
-} 
+}

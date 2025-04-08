@@ -1,30 +1,48 @@
 spring:
+  application:
+    name: revenue-assurance
   datasource:
     url: jdbc:postgresql://localhost:5432/ra
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   liquibase:
-    change-log: classpath:/db/changelog/db.changelog-master.yaml
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    enabled: true
+    default-schema: public
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
+server:
+  port: 8080
+
+# Настройки для ClickHouse
 clickhouse:
-  host: localhost
-  port: 8124
-  database: ra_analytics
+  url: jdbc:clickhouse://localhost:8123/ra_analytics
   username: default
-  password: clickhouse
-  
+  password:
+  database: ra_analytics
+  enabled: false # Отключаем ClickHouse для локальной разработки, если сервер не запущен
+
+# Настройки для мониторинга файлов
 app:
-  file-monitor:
-    input-directory: ${MONITOR_INPUT_DIR:./data/input}
-    done-directory: ${MONITOR_DONE_DIR:./data/done}
-    error-directory: ${MONITOR_ERROR_DIR:./data/error}
-    file-pattern: Transactions_*.csv 
+  file-watcher:
+    input-dir: data/input
+    done-dir: data/done
+    error-dir: data/error
+    file-pattern: "*.csv"
+    interval: 60000
+    enabled: true 

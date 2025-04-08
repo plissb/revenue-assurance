@@ -1,9 +1,10 @@
 package com.quantum.ra.service;
 
 import com.quantum.ra.model.Transaction;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
@@ -21,11 +22,15 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
+@ConditionalOnProperty(name = "clickhouse.enabled", havingValue = "true", matchIfMissing = true)
 public class ClickHouseService {
 
-    @Qualifier("clickHouseDataSource")
     private final DataSource clickHouseDataSource;
+
+    public ClickHouseService(@Qualifier("clickHouseDataSource") DataSource clickHouseDataSource) {
+        this.clickHouseDataSource = clickHouseDataSource;
+        log.info("ClickHouseService initialized");
+    }
 
     /**
      * Сохраняет транзакции в ClickHouse через JDBC

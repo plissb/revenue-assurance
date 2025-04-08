@@ -3,8 +3,9 @@ package com.quantum.ra.service;
 import com.quantum.ra.model.FileUpload;
 import com.quantum.ra.model.Transaction;
 import com.quantum.ra.repository.FileUploadRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +27,26 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CsvService {
 
-    private final ClickHouseService clickHouseService;
     private final FileUploadRepository fileUploadRepository;
+    private final ClickHouseService clickHouseService;
+    
+    @Value("${clickhouse.enabled:true}")
+    private boolean clickhouseEnabled;
     
     private static final Path INPUT_DIR = Paths.get("data/input");
     private static final Path DONE_DIR = Paths.get("data/done");
     private static final Path ERROR_DIR = Paths.get("data/error");
+
+    @Autowired
+    public CsvService(FileUploadRepository fileUploadRepository, 
+                      @Autowired(required = false) ClickHouseService clickHouseService) {
+        this.fileUploadRepository = fileUploadRepository;
+        this.clickHouseService = clickHouseService;
+        log.info("CsvService initialized, ClickHouse enabled: {}", 
+                clickHouseService != null ? "true" : "false");
+    }
 
     /**
      * Загружает данные из CSV файла в ClickHouse
@@ -83,9 +95,15 @@ public class CsvService {
                 
                 log.info("Прочитано {} транзакций из файла {}", transactions.size(), file.getName());
                 
-                // Загружаем данные в ClickHouse
+                // Загружаем данные в ClickHouse если он доступен
+                int recordsProcessed = 0;
                 if (!transactions.isEmpty()) {
-                    int recordsProcessed = clickHouseService.saveTransactions(transactions, fileUpload.getId());
+                    if (clickHouseService != null && clickhouseEnabled) {
+                        recordsProcessed = clickHouseService.saveTransactions(transactions, fileUpload.getId());
+                    } else {
+                        log.info("ClickHouse недоступен, данные не будут загружены");
+                        recordsProcessed = transactions.size(); // Считаем все записи обработанными
+                    }
                     
                     // Обновляем статус загрузки
                     fileUpload.setStatus("COMPLETED");

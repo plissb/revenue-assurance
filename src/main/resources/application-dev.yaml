@@ -1,0 +1,26 @@
+# Профиль для локальной разработки
+
+# Настройки Spring
+spring:
+  liquibase:
+    enabled: false  # Отключаем Liquibase для локальной разработки без БД
+  jpa:
+    hibernate:
+      ddl-auto: update  # Автоматическое обновление схемы
+    generate-ddl: true
+    properties:
+      hibernate:
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  thymeleaf:
+    cache: false  # Отключаем кэш для быстрой разработки
+  devtools:
+    restart:
+      enabled: true  # Включаем быструю перезагрузку
+    livereload:
+      enabled: true  # Включаем автоматическое обновление страницы
+
+# Отключаем ClickHouse для локальной разработки
+clickhouse:
+  enabled: false 

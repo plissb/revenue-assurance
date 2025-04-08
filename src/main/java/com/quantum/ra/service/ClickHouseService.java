@@ -1,4 +1,4 @@
-package com.quantum.revenueassurance.service;
+package com.quantum.ra.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

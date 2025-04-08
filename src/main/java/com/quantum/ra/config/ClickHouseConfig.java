@@ -1,4 +1,4 @@
-package com.quantum.revenueassurance.config;
+package com.quantum.ra.config;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

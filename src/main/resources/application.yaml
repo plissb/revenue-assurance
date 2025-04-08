@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ra
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  liquibase:
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+clickhouse:
+  url: jdbc:clickhouse://localhost:8124/ra_analytics
+  username: default
+  password: clickhouse
+  
+app:
+  file-monitor:
+    input-directory: ${MONITOR_INPUT_DIR:./data/input}
+    done-directory: ${MONITOR_DONE_DIR:./data/done}
+    error-directory: ${MONITOR_ERROR_DIR:./data/error}
+    file-pattern: Transactions_*.csv 

@@ -1,0 +1,57 @@
+<clickhouse>
+    <logger>
+        <level>information</level>
+        <console>1</console>
+    </logger>
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+    </query_log>
+    
+    <!-- Отключаем проверку неправильных настроек -->
+    <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings>
+    
+    <!-- Настройки памяти на верхнем уровне -->
+    <max_memory_usage>8000000000</max_memory_usage>
+    <max_server_memory_usage>10000000000</max_server_memory_usage>
+    
+    <!-- Настройки HTTP сервера -->
+    <http_server_default_response>
+        <name>Ok.</name>
+    </http_server_default_response>
+    
+    <!-- Разрешаем внешние соединения -->
+    <listen_host>::</listen_host>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+    
+    <!-- Настройки пользователей -->
+    <users>
+        <default>
+            <password>clickhouse</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+        </default>
+    </users>
+    
+    <profiles>
+        <default>
+        </default>
+    </profiles>
+    
+    <quotas>
+        <default>
+            <interval>
+                <duration>3600</duration>
+                <queries>0</queries>
+                <errors>0</errors>
+                <result_rows>0</result_rows>
+                <read_rows>0</read_rows>
+                <execution_time>0</execution_time>
+            </interval>
+        </default>
+    </quotas>
+</clickhouse> 
